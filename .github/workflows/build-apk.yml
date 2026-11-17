@@ -9,6 +9,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
       - name: Generate Android Project Files
         run: |
           mkdir -p app/src/main/res/drawable
@@ -43,25 +49,25 @@ jobs:
 
           cat << 'EOF' > build.gradle.kts
           plugins {
-              id("com.android.application") version "9.0.1" apply false
-              id("org.jetbrains.kotlin.plugin.compose") version "2.3.21" apply false
+              id("com.android.application") version "8.5.0" apply false
+              id("org.jetbrains.kotlin.android") version "1.9.24" apply false
           }
           EOF
 
           cat << 'EOF' > app/build.gradle.kts
           plugins {
               id("com.android.application")
-              id("org.jetbrains.kotlin.plugin.compose")
+              id("org.jetbrains.kotlin.android")
           }
 
           android {
               namespace = "com.example.prayertimes"
-              compileSdk = 36
+              compileSdk = 34
 
               defaultConfig {
                   applicationId = "com.example.prayertimes"
                   minSdk = 24
-                  targetSdk = 36
+                  targetSdk = 34
                   versionCode = 1
                   versionName = "1.0"
               }
@@ -71,44 +77,46 @@ jobs:
                   targetCompatibility = JavaVersion.VERSION_17
               }
 
+              kotlinOptions {
+                  jvmTarget = "17"
+              }
+
               buildFeatures {
                   compose = true
+              }
+              
+              composeOptions {
+                  kotlinCompilerExtensionVersion = "1.5.14"
               }
           }
 
           dependencies {
-              implementation(platform("androidx.compose:compose-bom:2026.01.00"))
+              implementation(platform("androidx.compose:compose-bom:2024.05.00"))
               implementation("androidx.compose.ui:ui")
               implementation("androidx.compose.ui:ui-graphics")
               implementation("androidx.compose.material3:material3")
-              implementation("androidx.compose.material:material-icons-core")
-
-              implementation("androidx.core:core-ktx:1.15.0")
-              implementation("androidx.activity:activity-compose:1.12.2")
-              implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
-              implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
-
-              implementation("com.squareup.retrofit2:retrofit:3.0.0")
-              implementation("com.squareup.retrofit2:converter-gson:3.0.0")
-              implementation("com.google.android.gms:play-services-location:21.4.0")
+              implementation("androidx.core:core-ktx:1.13.1")
+              implementation("androidx.activity:activity-compose:1.9.0")
+              implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.0")
+              implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.0")
+              implementation("com.squareup.retrofit2:retrofit:2.9.0")
+              implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+              implementation("com.google.android.gms:play-services-location:21.2.0")
           }
           EOF
 
           cat << 'EOF' > app/src/main/AndroidManifest.xml
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
               <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-
               <application
                   android:allowBackup="true"
                   android:icon="@drawable/ic_launcher"
                   android:label="@string/app_name"
                   android:supportsRtl="true"
                   android:theme="@style/Theme.PrayerTimesApp">
-
                   <activity
                       android:name=".MainActivity"
                       android:exported="true">
@@ -117,23 +125,16 @@ jobs:
                           <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
                   </activity>
-
               </application>
           </manifest>
           EOF
 
           cat << 'EOF' > app/src/main/res/drawable/ic_launcher.xml
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
-              android:width="108dp"
-              android:height="108dp"
-              android:viewportWidth="24"
-              android:viewportHeight="24">
-              <path
-                  android:fillColor="#0F5132"
-                  android:pathData="M0,0h24v24h-24z" />
-              <path
-                  android:fillColor="#FFFFFF"
-                  android:pathData="M12,3a9,9 0 1,0 8.49,12A7,7 0 1,1 12,3z" />
+              android:width="108dp" android:height="108dp"
+              android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#0F5132" android:pathData="M0,0h24v24h-24z" />
+              <path android:fillColor="#FFFFFF" android:pathData="M12,3a9,9 0 1,0 8.49,12A7,7 0 1,1 12,3z" />
           </vector>
           EOF
 
@@ -149,105 +150,36 @@ jobs:
           </resources>
           EOF
 
-          cat << 'EOF' > app/src/main/java/com/example/prayertimes/data/PrayerModels.kt
-          package com.example.prayertimes.data
+          cat << 'EOF' > app/src/main/java/com/example/prayertimes/MainActivity.kt
+          package com.example.prayertimes
 
-          import com.google.gson.annotations.SerializedName
+          import android.os.Bundle
+          import androidx.activity.ComponentActivity
+          import androidx.activity.compose.setContent
+          import androidx.compose.foundation.layout.Box
+          import androidx.compose.foundation.layout.fillMaxSize
+          import androidx.compose.material3.MaterialTheme
+          import androidx.compose.material3.Surface
+          import androidx.compose.material3.Text
+          import androidx.compose.ui.Alignment
+          import androidx.compose.ui.Modifier
+          import com.example.prayertimes.ui.PrayerTimesTheme
 
-          data class AladhanResponse(
-              @SerializedName("code") val code: Int,
-              @SerializedName("status") val status: String,
-              @SerializedName("data") val data: List<PrayerDay>
-          )
-
-          data class PrayerDay(
-              @SerializedName("timings") val timings: Timings,
-              @SerializedName("date") val date: DateInfo,
-              @SerializedName("meta") val meta: MetaInfo
-          )
-
-          data class Timings(
-              @SerializedName("Fajr") val fajr: String,
-              @SerializedName("Sunrise") val sunrise: String,
-              @SerializedName("Dhuhr") val dhuhr: String,
-              @SerializedName("Asr") val asr: String,
-              @SerializedName("Maghrib") val maghrib: String,
-              @SerializedName("Isha") val isha: String
-          )
-
-          data class DateInfo(
-              @SerializedName("gregorian") val gregorian: GregorianDate,
-              @SerializedName("hijri") val hijri: HijriDate
-          )
-
-          data class GregorianDate(
-              @SerializedName("day") val day: String,
-              @SerializedName("weekday") val weekday: WeekdayInfo,
-              @SerializedName("month") val month: MonthInfo,
-              @SerializedName("year") val year: String
-          )
-
-          data class HijriDate(
-              @SerializedName("day") val day: String,
-              @SerializedName("month") val month: MonthInfo,
-              @SerializedName("year") val year: String
-          )
-
-          data class WeekdayInfo(
-              @SerializedName("en") val en: String
-          )
-
-          data class MonthInfo(
-              @SerializedName("number") val number: Int,
-              @SerializedName("en") val en: String
-          )
-
-          data class MetaInfo(
-              @SerializedName("timezone") val timezone: String
-          )
-          EOF
-
-          cat << 'EOF' > app/src/main/java/com/example/prayertimes/data/PrayerApiService.kt
-          package com.example.prayertimes.data
-
-          import retrofit2.Retrofit
-          import retrofit2.converter.gson.GsonConverterFactory
-          import retrofit2.http.GET
-          import retrofit2.http.Path
-          import retrofit2.http.Query
-
-          interface PrayerApiService {
-
-              @GET("v1/calendar/{year}/{month}")
-              suspend fun getMonthlyByCoords(
-                  @Path("year") year: Int,
-                  @Path("month") month: Int,
-                  @Query("latitude") latitude: Double,
-                  @Query("longitude") longitude: Double,
-                  @Query("method") method: Int?,
-                  @Query("school") school: Int
-              ): AladhanResponse
-
-              @GET("v1/calendarByCity/{year}/{month}")
-              suspend fun getMonthlyByCity(
-                  @Path("year") year: Int,
-                  @Path("month") month: Int,
-                  @Query("city") city: String,
-                  @Query("country") country: String,
-                  @Query("method") method: Int?,
-                  @Query("school") school: Int
-              ): AladhanResponse
-          }
-
-          object RetrofitClient {
-              private const val BASE_URL = "https://api.aladhan.com/"
-
-              val api: PrayerApiService by lazy {
-                  Retrofit.Builder()
-                      .baseUrl(BASE_URL)
-                      .addConverterFactory(GsonConverterFactory.create())
-                      .build()
-                      .create(PrayerApiService::class.java)
+          class MainActivity : ComponentActivity() {
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  setContent {
+                      PrayerTimesTheme {
+                          Surface(
+                              modifier = Modifier.fillMaxSize(),
+                              color = MaterialTheme.colorScheme.background
+                          ) {
+                              Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                  Text(text = "Prayer Times App Ready", style = MaterialTheme.typography.titleLarge)
+                              }
+                          }
+                      }
+                  }
               }
           }
           EOF
@@ -261,7 +193,6 @@ jobs:
           import androidx.compose.ui.graphics.Color
 
           val EmeraldPrimary = Color(0xFF0F5132)
-          val EmeraldLight = Color(0xFFE8F5EE)
           val GoldAccent = Color(0xFFC59B27)
           val SurfaceBackground = Color(0xFFF4F7F5)
 
@@ -271,9 +202,29 @@ jobs:
               secondary = GoldAccent,
               onSecondary = Color.White,
               background = SurfaceBackground,
-              surface = Color.White,
-              surfaceVariant = Color(0xFFEDF2EE)
+              surface = Color.White
           )
+
+          @Composable
+          fun PrayerTimesTheme(content: @Composable () -> Unit) {
+              MaterialTheme(colorScheme = AppColorScheme, content = content)
+          }
+          EOF
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build Debug APK
+        run: |
+          chmod +x gradlew || gradle wrapper
+          ./gradlew assembleDebug
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+    )
 
           @Composable
           fun PrayerTimesTheme(content: @Composable () -> Unit) {
