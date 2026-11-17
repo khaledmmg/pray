@@ -1,0 +1,511 @@
+name: Generate Project and Build APK
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate Android Project Files
+        run: |
+          mkdir -p app/src/main/res/drawable
+          mkdir -p app/src/main/res/values
+          mkdir -p app/src/main/java/com/example/prayertimes/data
+          mkdir -p app/src/main/java/com/example/prayertimes/ui
+
+          cat << 'EOF' > gradle.properties
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          android.useAndroidX=true
+          android.nonTransitiveRClass=true
+          EOF
+
+          cat << 'EOF' > settings.gradle.kts
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "PrayerTimesApp"
+          include(":app")
+          EOF
+
+          cat << 'EOF' > build.gradle.kts
+          plugins {
+              id("com.android.application") version "9.0.1" apply false
+              id("org.jetbrains.kotlin.plugin.compose") version "2.3.21" apply false
+          }
+          EOF
+
+          cat << 'EOF' > app/build.gradle.kts
+          plugins {
+              id("com.android.application")
+              id("org.jetbrains.kotlin.plugin.compose")
+          }
+
+          android {
+              namespace = "com.example.prayertimes"
+              compileSdk = 36
+
+              defaultConfig {
+                  applicationId = "com.example.prayertimes"
+                  minSdk = 24
+                  targetSdk = 36
+                  versionCode = 1
+                  versionName = "1.0"
+              }
+
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+
+              buildFeatures {
+                  compose = true
+              }
+          }
+
+          dependencies {
+              implementation(platform("androidx.compose:compose-bom:2026.01.00"))
+              implementation("androidx.compose.ui:ui")
+              implementation("androidx.compose.ui:ui-graphics")
+              implementation("androidx.compose.material3:material3")
+              implementation("androidx.compose.material:material-icons-core")
+
+              implementation("androidx.core:core-ktx:1.15.0")
+              implementation("androidx.activity:activity-compose:1.12.2")
+              implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+              implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
+
+              implementation("com.squareup.retrofit2:retrofit:3.0.0")
+              implementation("com.squareup.retrofit2:converter-gson:3.0.0")
+              implementation("com.google.android.gms:play-services-location:21.4.0")
+          }
+          EOF
+
+          cat << 'EOF' > app/src/main/AndroidManifest.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+              <application
+                  android:allowBackup="true"
+                  android:icon="@drawable/ic_launcher"
+                  android:label="@string/app_name"
+                  android:supportsRtl="true"
+                  android:theme="@style/Theme.PrayerTimesApp">
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+
+              </application>
+          </manifest>
+          EOF
+
+          cat << 'EOF' > app/src/main/res/drawable/ic_launcher.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp"
+              android:height="108dp"
+              android:viewportWidth="24"
+              android:viewportHeight="24">
+              <path
+                  android:fillColor="#0F5132"
+                  android:pathData="M0,0h24v24h-24z" />
+              <path
+                  android:fillColor="#FFFFFF"
+                  android:pathData="M12,3a9,9 0 1,0 8.49,12A7,7 0 1,1 12,3z" />
+          </vector>
+          EOF
+
+          cat << 'EOF' > app/src/main/res/values/strings.xml
+          <resources>
+              <string name="app_name">Prayer Times</string>
+          </resources>
+          EOF
+
+          cat << 'EOF' > app/src/main/res/values/themes.xml
+          <resources>
+              <style name="Theme.PrayerTimesApp" parent="android:Theme.Material.Light.NoActionBar" />
+          </resources>
+          EOF
+
+          cat << 'EOF' > app/src/main/java/com/example/prayertimes/data/PrayerModels.kt
+          package com.example.prayertimes.data
+
+          import com.google.gson.annotations.SerializedName
+
+          data class AladhanResponse(
+              @SerializedName("code") val code: Int,
+              @SerializedName("status") val status: String,
+              @SerializedName("data") val data: List<PrayerDay>
+          )
+
+          data class PrayerDay(
+              @SerializedName("timings") val timings: Timings,
+              @SerializedName("date") val date: DateInfo,
+              @SerializedName("meta") val meta: MetaInfo
+          )
+
+          data class Timings(
+              @SerializedName("Fajr") val fajr: String,
+              @SerializedName("Sunrise") val sunrise: String,
+              @SerializedName("Dhuhr") val dhuhr: String,
+              @SerializedName("Asr") val asr: String,
+              @SerializedName("Maghrib") val maghrib: String,
+              @SerializedName("Isha") val isha: String
+          )
+
+          data class DateInfo(
+              @SerializedName("gregorian") val gregorian: GregorianDate,
+              @SerializedName("hijri") val hijri: HijriDate
+          )
+
+          data class GregorianDate(
+              @SerializedName("day") val day: String,
+              @SerializedName("weekday") val weekday: WeekdayInfo,
+              @SerializedName("month") val month: MonthInfo,
+              @SerializedName("year") val year: String
+          )
+
+          data class HijriDate(
+              @SerializedName("day") val day: String,
+              @SerializedName("month") val month: MonthInfo,
+              @SerializedName("year") val year: String
+          )
+
+          data class WeekdayInfo(
+              @SerializedName("en") val en: String
+          )
+
+          data class MonthInfo(
+              @SerializedName("number") val number: Int,
+              @SerializedName("en") val en: String
+          )
+
+          data class MetaInfo(
+              @SerializedName("timezone") val timezone: String
+          )
+          EOF
+
+          cat << 'EOF' > app/src/main/java/com/example/prayertimes/data/PrayerApiService.kt
+          package com.example.prayertimes.data
+
+          import retrofit2.Retrofit
+          import retrofit2.converter.gson.GsonConverterFactory
+          import retrofit2.http.GET
+          import retrofit2.http.Path
+          import retrofit2.http.Query
+
+          interface PrayerApiService {
+
+              @GET("v1/calendar/{year}/{month}")
+              suspend fun getMonthlyByCoords(
+                  @Path("year") year: Int,
+                  @Path("month") month: Int,
+                  @Query("latitude") latitude: Double,
+                  @Query("longitude") longitude: Double,
+                  @Query("method") method: Int?,
+                  @Query("school") school: Int
+              ): AladhanResponse
+
+              @GET("v1/calendarByCity/{year}/{month}")
+              suspend fun getMonthlyByCity(
+                  @Path("year") year: Int,
+                  @Path("month") month: Int,
+                  @Query("city") city: String,
+                  @Query("country") country: String,
+                  @Query("method") method: Int?,
+                  @Query("school") school: Int
+              ): AladhanResponse
+          }
+
+          object RetrofitClient {
+              private const val BASE_URL = "https://api.aladhan.com/"
+
+              val api: PrayerApiService by lazy {
+                  Retrofit.Builder()
+                      .baseUrl(BASE_URL)
+                      .addConverterFactory(GsonConverterFactory.create())
+                      .build()
+                      .create(PrayerApiService::class.java)
+              }
+          }
+          EOF
+
+          cat << 'EOF' > app/src/main/java/com/example/prayertimes/ui/Theme.kt
+          package com.example.prayertimes.ui
+
+          import androidx.compose.material3.MaterialTheme
+          import androidx.compose.material3.lightColorScheme
+          import androidx.compose.runtime.Composable
+          import androidx.compose.ui.graphics.Color
+
+          val EmeraldPrimary = Color(0xFF0F5132)
+          val EmeraldLight = Color(0xFFE8F5EE)
+          val GoldAccent = Color(0xFFC59B27)
+          val SurfaceBackground = Color(0xFFF4F7F5)
+
+          private val AppColorScheme = lightColorScheme(
+              primary = EmeraldPrimary,
+              onPrimary = Color.White,
+              secondary = GoldAccent,
+              onSecondary = Color.White,
+              background = SurfaceBackground,
+              surface = Color.White,
+              surfaceVariant = Color(0xFFEDF2EE)
+          )
+
+          @Composable
+          fun PrayerTimesTheme(content: @Composable () -> Unit) {
+              MaterialTheme(
+                  colorScheme = AppColorScheme,
+                  content = content
+              )
+          }
+          EOF
+
+          cat << 'EOF' > app/src/main/java/com/example/prayertimes/ui/PrayerViewModel.kt
+          package com.example.prayertimes.ui
+
+          import android.content.Context
+          import android.location.Geocoder
+          import android.os.Build
+          import androidx.lifecycle.ViewModel
+          import androidx.lifecycle.viewModelScope
+          import com.example.prayertimes.data.PrayerDay
+          import com.example.prayertimes.data.RetrofitClient
+          import kotlinx.coroutines.Dispatchers
+          import kotlinx.coroutines.flow.MutableStateFlow
+          import kotlinx.coroutines.flow.StateFlow
+          import kotlinx.coroutines.flow.asStateFlow
+          import kotlinx.coroutines.flow.update
+          import kotlinx.coroutines.launch
+          import kotlinx.coroutines.suspendCancellableCoroutine
+          import kotlinx.coroutines.withContext
+          import java.util.Calendar
+          import java.util.Locale
+          import kotlin.coroutines.resume
+
+          data class CalculationMethodOption(val id: Int?, val label: String)
+
+          val calculationMethods = listOf(
+              CalculationMethodOption(null, "Auto (Nearest Authority)"),
+              CalculationMethodOption(4, "Umm Al-Qura, Makkah"),
+              CalculationMethodOption(3, "Muslim World League"),
+              CalculationMethodOption(2, "ISNA (North America)"),
+              CalculationMethodOption(5, "Egyptian General Authority"),
+              CalculationMethodOption(1, "Univ. of Islamic Sciences, Karachi"),
+              CalculationMethodOption(8, "Gulf Region"),
+              CalculationMethodOption(9, "Kuwait"),
+              CalculationMethodOption(10, "Qatar"),
+              CalculationMethodOption(13, "Diyanet, Turkey")
+          )
+
+          val monthNames = listOf(
+              "January", "February", "March", "April", "May", "June",
+              "July", "August", "September", "October", "November", "December"
+          )
+
+          data class PrayerUiState(
+              val city: String = "Riyadh",
+              val country: String = "Saudi Arabia",
+              val selectedMonth: Int = Calendar.getInstance().get(Calendar.MONTH) + 1,
+              val selectedYear: Int = Calendar.getInstance().get(Calendar.YEAR),
+              val selectedMethod: CalculationMethodOption = calculationMethods[1],
+              val asrSchool: Int = 0,
+              val use12Hour: Boolean = true,
+              val isUsingGps: Boolean = false,
+              val lastLat: Double? = null,
+              val lastLon: Double? = null,
+              val locationLabel: String = "Riyadh, Saudi Arabia",
+              val timezone: String = "",
+              val days: List<PrayerDay> = emptyList(),
+              val todayDay: PrayerDay? = null,
+              val isLoading: Boolean = false,
+              val errorMessage: String? = null
+          )
+
+          class PrayerViewModel : ViewModel() {
+
+              private val _uiState = MutableStateFlow(PrayerUiState())
+              val uiState: StateFlow<PrayerUiState> = _uiState.asStateFlow()
+
+              init {
+                  fetchByCity()
+              }
+
+              fun updateCity(value: String) {
+                  _uiState.update { it.copy(city = value) }
+              }
+
+              fun updateCountry(value: String) {
+                  _uiState.update { it.copy(country = value) }
+              }
+
+              fun updateMonth(month: Int) {
+                  _uiState.update { it.copy(selectedMonth = month) }
+                  refreshCurrentMode()
+              }
+
+              fun updateYear(year: Int) {
+                  _uiState.update { it.copy(selectedYear = year) }
+                  refreshCurrentMode()
+              }
+
+              fun updateMethod(option: CalculationMethodOption) {
+                  _uiState.update { it.copy(selectedMethod = option) }
+                  refreshCurrentMode()
+              }
+
+              fun updateAsrSchool(school: Int) {
+                  _uiState.update { it.copy(asrSchool = school) }
+                  refreshCurrentMode()
+              }
+
+              fun toggleTimeFormat(use12Hour: Boolean) {
+                  _uiState.update { it.copy(use12Hour = use12Hour) }
+              }
+
+              fun setError(message: String?) {
+                  _uiState.update { it.copy(errorMessage = message, isLoading = false) }
+              }
+
+              private fun refreshCurrentMode() {
+                  val state = _uiState.value
+                  if (state.isUsingGps && state.lastLat != null && state.lastLon != null) {
+                      fetchByCoordinates(state.lastLat, state.lastLon, state.locationLabel)
+                  } else {
+                      fetchByCity()
+                  }
+              }
+
+              fun fetchByCity() {
+                  val state = _uiState.value
+                  val city = state.city.trim()
+                  val country = state.country.trim()
+
+                  if (city.isEmpty() || country.isEmpty()) {
+                      setError("Please enter both City and Country.")
+                      return
+                  }
+
+                  viewModelScope.launch {
+                      _uiState.update {
+                          it.copy(isLoading = true, errorMessage = null, isUsingGps = false)
+                      }
+                      try {
+                          val response = RetrofitClient.api.getMonthlyByCity(
+                              year = state.selectedYear,
+                              month = state.selectedMonth,
+                              city = city,
+                              country = country,
+                              method = state.selectedMethod.id,
+                              school = state.asrSchool
+                          )
+                          handleSuccess(response.data, "$city, $country")
+                      } catch (e: Exception) {
+                          setError("Failed to fetch prayer times: ${e.localizedMessage ?: "Check internet connection"}")
+                      }
+                  }
+              }
+
+              fun fetchByGpsLocation(context: Context, lat: Double, lon: Double) {
+                  viewModelScope.launch {
+                      _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+                      val resolvedName = resolvePlaceName(context, lat, lon)
+                          ?: "GPS (${"%.4f".format(lat)}, ${"%.4f".format(lon)})"
+                      fetchByCoordinates(lat, lon, resolvedName)
+                  }
+              }
+
+              private fun fetchByCoordinates(lat: Double, lon: Double, label: String) {
+                  val state = _uiState.value
+                  viewModelScope.launch {
+                      _uiState.update {
+                          it.copy(
+                              isLoading = true,
+                              errorMessage = null,
+                              isUsingGps = true,
+                              lastLat = lat,
+                              lastLon = lon
+                          )
+                      }
+                      try {
+                          val response = RetrofitClient.api.getMonthlyByCoords(
+                              year = state.selectedYear,
+                              month = state.selectedMonth,
+                              latitude = lat,
+                              longitude = lon,
+                              method = state.selectedMethod.id,
+                              school = state.asrSchool
+                          )
+                          handleSuccess(response.data, label)
+                      } catch (e: Exception) {
+                          setError("Failed to fetch GPS prayer times: ${e.localizedMessage ?: "Check internet connection"}")
+                      }
+                  }
+              }
+
+              private fun handleSuccess(days: List<PrayerDay>, label: String) {
+                  val todayItem = days.firstOrNull { isToday(it) }
+                  val tz = days.firstOrNull()?.meta?.timezone.orEmpty()
+                  _uiState.update {
+                      it.copy(
+                          isLoading = false,
+                          errorMessage = null,
+                          days = days,
+                          todayDay = todayItem,
+                          locationLabel = label,
+                          timezone = tz
+                      )
+                  }
+              }
+
+              fun isToday(day: PrayerDay): Boolean {
+                  val cal = Calendar.getInstance()
+                  val g = day.date.gregorian
+                  return g.day.toIntOrNull() == cal.get(Calendar.DAY_OF_MONTH) &&
+                      g.month.number == (cal.get(Calendar.MONTH) + 1) &&
+                      g.year.toIntOrNull() == cal.get(Calendar.YEAR)
+              }
+
+              fun formatTime(rawTime: String): String {
+                  val clean = rawTime.substringBefore(" ").trim()
+                  if (!_uiState.value.use12Hour) return clean
+
+                  val parts = clean.split(":")
+                  if (parts.size < 2) return clean
+                  val hour24 = parts[0].toIntOrNull() ?: return clean
+                  val min = parts[1]
+                  val period = if (hour24 >= 12) "PM" else "AM"
+                  val hour12 = when {
+                      hour24 == 0 -> 12
+                      hour24 > 12 -> hour24 - 12
+                      else -> hour24
+                  }
+                  return "$hour12:$min $period"
+              }
+
+              @Suppress("DEPRECATION")
+              private suspend fun resolvePlaceName(context: Context, lat: Double, lon: Double): String? {
+                  if (!Geo
